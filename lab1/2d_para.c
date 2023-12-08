@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <omp.h>
-
+#include <chrono>
+#include <iostream>
+#include <fstream>
 #define ISIZE 15000
 #define JSIZE 15000
 
@@ -36,8 +38,8 @@ int main(int argc, char **argv)
 			stable_a[k * JSIZE + l] = a[k * JSIZE + l];
 		}
 	}
-	
-	clock_t start_time = clock();
+	auto&& start = std::chrono::high_resolution_clock::now();
+//	clock_t start_time = clock();
 	//начало измерения времени
 #pragma omp parallel num_threads(prog_num_threads)
 {	
@@ -70,8 +72,11 @@ int main(int argc, char **argv)
 	}
 */
 	//окончание измерения времени
-	clock_t end_time = clock();
-	printf("Time is %lf seconds\n", ((double) end_time - start_time) / CLOCKS_PER_SEC);
+//	clock_t end_time = clock();
+	auto&& end = std::chrono::high_resolution_clock::now();
+	auto&& passed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+//	printf("Time is %lf seconds\n", ((double) end_time - start_time) / CLOCKS_PER_SEC);
+    std::cerr << "Time in ms: " << passed << std::endl;
 	ff = fopen("result_para.txt","w");
 	for(k = 0; k < ISIZE; k++){
 		for (l = 0; l < JSIZE; l++){
