@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define ISIZE 15000
-#define JSIZE 15000
+#define ISIZE 5000
+#define JSIZE 5000
 
 // gcc 1e_cons.c -lm
 

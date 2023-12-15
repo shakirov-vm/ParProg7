@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 # d = '>', '<'
 # D = '-4', '8'
 
-x = [1, 2, 4]
-time = [2.849528, 1.527, 1.005]
+x = [1, 2, 3, 4]
+time = [2.849528, 1.415, 0.945, 0.826]
 
 eff = [time[0] / (time[i] * x[i]) for i in range (len(x))]
 

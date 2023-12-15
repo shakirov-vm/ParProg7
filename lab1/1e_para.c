@@ -3,15 +3,18 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include <time.h>
+#include <chrono>
+#include <iostream>
+#include <fstream>
 
-#define ISIZE 15000
-#define JSIZE 15000
+#define ISIZE 5000
+#define JSIZE 5000
 
 #define NULL_EXECUTOR 0
 #define ONE_ELEMENT 1
 #define TAG_2 2
 
-// mpicc 1e_para.c -lm
+// mpic++ 1e_para.c -lm
 // mpirun -np 2 a.out 
 
 int main(int argc, char** argv)
@@ -35,76 +38,47 @@ int main(int argc, char** argv)
 			a[i * JSIZE + j] = 10 * i + j;
 		}
 	}
-/*	
-	int distance = 1 * JSIZE + 8;
-	int per_one_distance = distance / commsize + (distance % commsize) / this_rank;
-	//начало измерения времени
-	int jump_distance = distance - per_one_distance;
 
-	int in_distance = 0;
-	for (i = 1; i < ISIZE; i++) {
-		for (j = 8; j < JSIZE; j++) {
-			a[i * JSIZE + j] = sin(5 * a[(i - 1) * JSIZE - 8]);
-			in_distance++;
-			if (in_distance >= per_one_distance) {
-				in_distance = 0;
-				j = (i * JSIZE + j + jump_distance) % JSIZE;
-				i = (i * JSIZE + j + jump_distance) / JSIZE;
-				MPI_Barrier(MPI_COMM_WORLD);
-			}
-		}
+#define JSIZE_CALC (JSIZE - 8)
+
+    int jsize_per_thread = JSIZE_CALC / commsize;
+    int line_start = jsize_per_thread * this_rank;
+    int line_end = jsize_per_thread * (this_rank + 1);
+	if (this_rank == commsize - 1) line_end = JSIZE_CALC;
+
+    int per_thread_size = line_end - line_start;
+    double per_thread_array[JSIZE];
+
+	int* recvcnts = (int*) calloc (commsize, sizeof(int));
+	int* displs = (int*) calloc (commsize, sizeof(int));
+
+	MPI_Barrier(MPI_COMM_WORLD);
+	for (int k = 0; k < commsize - 1; k++) {
+		recvcnts[k] = per_thread_size;
 	}
-*/
+	recvcnts[commsize - 1] = per_thread_size + JSIZE_CALC % commsize;
 
-	clock_t start_time = clock();
-	j = this_rank;
+    for (int k = 0; k < commsize; k++) {
+        displs[k] = 8 + k * per_thread_size; 
+    }
+
+	auto&& start = std::chrono::high_resolution_clock::now();
+
 	for (i = 0; i < ISIZE - 1; i++) {
-		for (; j < JSIZE - 8;) {
-			a[(1 + i) * JSIZE + (8 + j)] = sin(5 * a[i * JSIZE + j]);
-			j += commsize;
-		}
-		j %= (JSIZE - 8);
-	}
-	clock_t end_time = clock();
-	printf("Time is %lf seconds\n", ((double) end_time - start_time) / CLOCKS_PER_SEC);
-	//окончание измерения времени
+        for (j = line_start; j < line_end; j++) {
+            per_thread_array[j + 8] = std::sin(5 * a[i * JSIZE + j]);
+        }
 
-	if (this_rank != NULL_EXECUTOR) {
-		j = this_rank;
-		for (i = 0; i < ISIZE - 1; i++) {
-			for (; j < JSIZE - 8;) {
-				int index = (1 + i) * JSIZE + (j + 8);
-				MPI_Send(&a[index], ONE_ELEMENT, MPI_DOUBLE, NULL_EXECUTOR, TAG_2, MPI_COMM_WORLD);
-				j += commsize;
-				MPI_Barrier(MPI_COMM_WORLD);
-			}
-			j %= (JSIZE - 8);
-		}	
-	}
-	else {
-		j = 0;
-		for (i = 0; i < ISIZE - 1; i++) {
-			for (; j < JSIZE - 8;) {
-				for (int rank = NULL_EXECUTOR + 1; rank < commsize; rank++) {
-					int index = (1 + i + (j + 8 + rank) / JSIZE) * JSIZE + (j + 8 + rank) % JSIZE;
-					MPI_Recv(&a[index], ONE_ELEMENT, MPI_DOUBLE, rank, MPI_ANY_TAG, MPI_COMM_WORLD, NULL);
-				}
-				j += commsize;
-				MPI_Barrier(MPI_COMM_WORLD);
-			}
-			j %= (JSIZE - 8);
-		}
-	}
-/*
-	for (i = 1; i < ISIZE; i++) {
-		for (j = 8; j < JSIZE; j++) {
-			for (int in_distance = 0; in_distance < per_one_distance; in_distance++) {
-				a[i][j] = sin(5 * a[i - 1][j - 8]);
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-	}
-	*/
+        MPI_Allgatherv(&per_thread_array[line_start + 8], per_thread_size, MPI_DOUBLE, 
+        			&a[(i + 1) * JSIZE], recvcnts, displs, MPI_DOUBLE, MPI_COMM_WORLD);
+    }
+
+	auto&& end = std::chrono::high_resolution_clock::now();
+	auto&& passed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+	MPI_Barrier(MPI_COMM_WORLD);
+
+    std::cerr << "Time in ms: " << passed << std::endl;
+
 	if (this_rank == NULL_EXECUTOR) {
 		ff = fopen("result_para.txt","w");
 		for(i = 0; i < ISIZE; i++){
@@ -116,6 +90,8 @@ int main(int argc, char** argv)
 		fclose(ff);
 	}
 	free(a);
+	free(recvcnts);
+	free(displs);
 
 	MPI_Finalize();
 }

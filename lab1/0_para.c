@@ -10,7 +10,7 @@
 #define ISIZE 15000
 #define JSIZE 15000
 
-// g++ 2d_para.c -lm -fopenmp 
+// g++ 0_para.c -lm -fopenmp 
 
 int main(int argc, char **argv)
 {
@@ -36,15 +36,13 @@ int main(int argc, char **argv)
 	}
 	auto&& start = std::chrono::high_resolution_clock::now();
 	
-	for (int i = 0; i < ISIZE - 4; i++) {        
-
-        #pragma omp parallel for num_threads(prog_num_threads)
-        for (int j = 5; j < JSIZE; j++) {
-            a[i * JSIZE + j] = sin(0.1 * a[(i + 4) * JSIZE + j - 5]);
+    #pragma omp parallel for num_threads(prog_num_threads)
+    for (int i = 0; i < ISIZE; ++i) {
+        for (int j = 0; j < JSIZE; ++j) {
+            a[i * JSIZE + j] = std::sin(2 * a[i * JSIZE + j]);
         }
-        // implicit barrier
     }
-    
+
 	auto&& end = std::chrono::high_resolution_clock::now();
 	auto&& passed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 //	printf("Time is %lf seconds\n", ((double) end_time - start_time) / CLOCKS_PER_SEC);
